@@ -61,6 +61,7 @@ end
 
 local function draw_checks(prog)
   local sel_game = prog.games[prog.selected_id]
+  if sel_game == nil then return end
   love.graphics.setFont(smallfont)
   love.graphics.push()
   love.graphics.translate(grid_size * 16, grid_size)
