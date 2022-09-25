@@ -28,6 +28,11 @@ return {
       prog:change_state('prompt_new')
     end,
     ---@param prog Program
+    back = function(prog)
+      os.execute('git pull origin')
+      love.event.quit()
+    end,
+    ---@param prog Program
     up = function(prog)
       prog.selected_id = ((prog.selected_id - 2) % #prog.games) + 1
     end,

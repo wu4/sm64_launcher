@@ -100,6 +100,7 @@ local pressed = {
   b = false,
   y = false,
   x = false,
+  back = false,
   up = false,
   down = false,
   left = false,
@@ -126,10 +127,11 @@ function love.update(dt)
   local joy_y = joy:getAxis(2)
   local joy_x = joy:getAxis(1)
 
-  for _, v in ipairs{'a', 'b', 'x', 'y'} do
+  for _, v in ipairs{'a', 'b', 'x', 'y', 'back'} do
     if joy:isGamepadDown(v) then
-      if not pressed[v] then
-        prog.state.callbacks[v](prog)
+      local callback = prog.state.callbacks[v]
+      if callback and not pressed[v] then
+        callback(prog)
       end
       pressed[v] = true
     else
