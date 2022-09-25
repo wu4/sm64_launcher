@@ -4,7 +4,7 @@ local gfx = require 'gfx'
 local default = {}
 
 return {
-  controls = '(a) start  (y) start new game  (x) delete game  (b) exit',
+  controls = '(back) check for updates and close  (a) start  (y) start new game  (x) delete game  (b) exit',
 
   init = function()
 
