@@ -1,4 +1,4 @@
-love.window.setMode(0, 0, {fullscreen = true, fullscreentype = 'exclusive', borderless=true})
+love.window.setMode(0, 0, {fullscreen = true, fullscreentype = 'desktop', borderless=true})
 love.keyboard.setTextInput(false)
 
 ---@type love.Joystick
