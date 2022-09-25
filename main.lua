@@ -1,3 +1,6 @@
+love.window.setMode(0, 0, {fullscreen = true, fullscreentype = 'exclusive', borderless=true})
+love.keyboard.setTextInput(false)
+
 ---@type love.Joystick
 local joy
 
@@ -7,10 +10,31 @@ local timeago = require 'lib.timeago'
 local ffi     = require 'ffi'
 local sm64parse = require 'parse'
 local dir = require 'dir'
+local gfx = require 'gfx'
 
 local config = require 'config'
 
-local function launch(name, ip)
+local states = {}
+states.default = require 'states.default'
+states.prompt_delete = require 'states.prompt_delete'
+states.prompt_new = require 'states.prompt_new'
+
+---@class Program
+local prog = {
+  cur_state = 'default',
+  state = states.default,
+  ---@type Game[]
+  games = {},
+  selected_id = 1
+}
+
+function prog:change_state(state)
+  self.cur_state = state
+  self.state = states[state]
+  states[state].init(self)
+end
+
+function prog:launch(name, ip)
   -- joy:release()
   love.window.close()
 
@@ -45,188 +69,121 @@ local function parse_url(url)
   if ip == nil or name == nil then
     
   else
-    launch(name, ip)
+    prog:launch(name, ip)
   end
 end
 
----@type Game[]
-local games
-local selected_id = 1
-
-local smallfont = love.graphics.newFont(22)
-local bigfont = love.graphics.newFont(44)
 function love.load(...)
-  love.window.setMode(0, 0, {fullscreen = true, fullscreentype = 'exclusive', borderless=true})
   local a = ...
   if a[1] ~= nil then
     parse_url(a[1])
   else
     joy = love.joystick.getJoysticks()[1]
-    games = dir.get_games()
-    for k, v in pairs(games) do
-      print('table '..k)
-      for kk, vv in pairs(v) do
-        print(kk, vv)
-      end
-    end
+    prog.games = dir.get_games()
+  end
+end
+
+function love.keypressed(key)
+  if prog.state.callbacks.keypressed then
+    prog.state.callbacks.keypressed(prog, key)
+  end
+end
+
+function love.textinput(key)
+  if prog.state.callbacks.textinput then
+    prog.state.callbacks.textinput(prog, key)
   end
 end
 
 local pressed = {
   a = false,
   b = false,
+  y = false,
+  x = false,
   up = false,
-  down = false
+  down = false,
+  left = false,
+  right = false
 }
+
+function love.draw()
+  if prog.cur_state ~= 'default' then
+    states.default.draw(prog)
+    love.graphics.setColor(0,0,0, 0.8)
+    love.graphics.rectangle('fill', 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+  end
+  prog.state.draw(prog)
+
+  love.graphics.setColor(1,1,1, 0.5)
+  love.graphics.setFont(gfx.smallfont)
+
+  local w = gfx.smallfont:getWidth(prog.state.controls)
+  love.graphics.print(prog.state.controls, love.graphics.getWidth() - w, love.graphics.getHeight() - gfx.smallfont:getHeight())
+end
+
 function love.update(dt)
-  if love.keyboard.isDown('q') then love.event.quit() end
+  if love.keyboard.isDown('escape') then love.event.quit() end
   local joy_y = joy:getAxis(2)
+  local joy_x = joy:getAxis(1)
+
+  for _, v in ipairs{'a', 'b', 'x', 'y'} do
+    if joy:isGamepadDown(v) then
+      if not pressed[v] then
+        prog.state.callbacks[v](prog)
+      end
+      pressed[v] = true
+    else
+      pressed[v] = false
+    end
+  end
+
+  if joy:isGamepadDown('x') then
+    if not pressed.x then
+      while true do
+        love.event.pump()
+        love.graphics.clear(0,0,0)
+        love.graphics.present()
+        if joy:isGamepadDown('b') then
+          pressed.b = true
+          break
+        end
+      end
+    end
+    pressed.x = true
+  else
+    pressed.x = false
+  end
+
   if joy_y > 0.3 or joy:isGamepadDown('dpdown') then
-    if not pressed.down then
-      selected_id = (selected_id % #games) + 1
+    if not pressed.down and prog.state.callbacks.down then
+      prog.state.callbacks.down(prog)
     end
     pressed.down = true
   else
     pressed.down = false
   end
   if joy_y < -0.3 or joy:isGamepadDown('dpup') then
-    if not pressed.up then
-      selected_id = ((selected_id - 2) % #games) + 1
+    if not pressed.up and prog.state.callbacks.up then
+      prog.state.callbacks.up(prog)
     end
     pressed.up = true
   else
     pressed.up = false
   end
-  if joy:isGamepadDown('a') then
-    launch(games[selected_id].player_name, games[selected_id].ip)
-  end
-end
-
---[[
----comment
----@param file string
----@return number
-local function get_modified_time(file)
-  local f = assert(io.popen("stat -c %Y '" .. file .. "'"))
-  local last_modified = tonumber(f:read("%l"))
-  if last_modified then
-    return last_modified
-  else
-    return -1
-  end
-end
---]]
-
-local function print_columns(cols, width, y)
-  -- local origin_left = width > 800 and ((width / 2) - 400) or 0
-  local origin_left = 0
-
-  local fixed_proportion = 0
-  local non_fixed_count = 0
-  for _, v in ipairs(cols) do
-    if v[2] ~= -1 then
-      fixed_proportion = fixed_proportion + v[2]
-    else
-      non_fixed_count = non_fixed_count + 1
+  if joy_x > 0.3 or joy:isGamepadDown('dpright') then
+    if not pressed.right and prog.state.callbacks.right then
+      prog.state.callbacks.right(prog)
     end
-  end
-  local remaining = width - fixed_proportion
-  local non_fixed_width = remaining / non_fixed_count
-
-  local cur_x = origin_left
-  for x, v in ipairs(cols) do
-    local w = v[2] == -1 and non_fixed_width or v[2]
-    love.graphics.printf(v[1], cur_x, y, w, 'left')
-    cur_x = cur_x + w
-  end
-end
-
-local function draw_check(check, x, y, r,g,b, circle)
-  if check then
-    love.graphics.setColor(r,g,b)
+    pressed.right = true
   else
-    love.graphics.setColor(0.5, 0.5, 0.5)
+    pressed.right = false
   end
-  if circle then
-    love.graphics.circle('fill', x + 16, y + 16, 15)
-  else
-    love.graphics.rectangle('fill', x, y, 31, 31)
-  end
-end
-
----@param stage Stage
-local function draw_stage_checks(stage)
-  love.graphics.setColor(0.5, 0.5, 0.5)
-  love.graphics.printf(stage.shortname, 0, 0, 100, 'right')
-  for star_x, star in ipairs(stage) do
-    draw_check(star, 100 + (star_x * 32), 0, 1,1,0)
-  end
-  if stage.cannon ~= nil then
-    draw_check(stage.cannon, 100 + (8.5 * 32), 0, 1,0,0.5, true)
-  end
-end
-
-local function draw_checks()
-  local sel_game = games[selected_id]
-  love.graphics.setFont(smallfont)
-  love.graphics.push()
-  love.graphics.translate(512, 32)
-  draw_stage_checks(sel_game.stages[1])
-  love.graphics.pop()
-  for star_y = 2, 16 do
-    love.graphics.push()
-    love.graphics.translate(0, (star_y - 1) * 32)
-    draw_stage_checks(sel_game.stages[star_y])
-    love.graphics.pop()
-  end
-  for star_y = 1, 9 do
-    love.graphics.push()
-    love.graphics.translate(512, (star_y + 1) * 32)
-    draw_stage_checks(sel_game.stages[star_y + 16])
-    love.graphics.pop()
-  end
-
-  love.graphics.push()
-  love.graphics.translate(612+64+16, 96)
-  local caps_keys = sel_game.stages.caps_keys
-  draw_check(caps_keys[1], 0, 32*4, 1,0,0)
-  draw_check(caps_keys[2], 0, 32*3, 1,0,0)
-  draw_check(caps_keys[3], 0, 32*5, 1,0,0)
-
-  draw_check(caps_keys[4], 0, 0, 1,0.5,0)
-  draw_check(caps_keys[3], 0, 32, 1,0.5,0)
-  love.graphics.pop()
-end
-
-function love.draw()
-  love.graphics.setColor(1, 1, 1)
-  love.graphics.setFont(smallfont)
-  local elem_width = love.graphics.getWidth() / 2
-  print_columns({
-    {'Checks', 100},
-    {'Name', -1},
-    {'Last played', -1},
-  }, elem_width, 16)
-  love.graphics.setFont(bigfont)
-  local y = 60
-  for id, game in pairs(games) do
-    if selected_id == id then
-      love.graphics.setColor(1, 1, 1)
-      love.graphics.rectangle('fill', 0, y, elem_width, 60)
-      love.graphics.setColor(0, 0, 0)
-    else
-      love.graphics.setColor(0.5, 0.5, 0.5)
+  if joy_x < -0.3 or joy:isGamepadDown('dpleft') then
+    if not pressed.left and prog.state.callbacks.left then
+      prog.state.callbacks.left(prog)
     end
-    print_columns({
-      {game.completion, 100},
-      {game.player_name, -1},
-      {timeago.format(game.last_played), -1},
-    }, elem_width, y + 4)
-    y = y + 60
+    pressed.left = true
+  else
+    pressed.left = false
   end
-
-  love.graphics.push()
-  love.graphics.translate(love.graphics.getWidth() / 2, 0)
-  draw_checks()
-  love.graphics.pop()
 end

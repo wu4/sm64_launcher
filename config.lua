@@ -6,6 +6,7 @@ local json = require 'lib.json'
 ---@class Config
 ---@field binary_dir string
 ---@field config_dir string
+---@field default_name string
 
 local f = assert(io.open(os.getenv("HOME") .. "/.local/share/sm64ex/sm64_launcher.json", 'r'))
 

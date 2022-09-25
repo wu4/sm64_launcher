@@ -7,6 +7,7 @@ local json = require 'lib.json'
 ---@field last_played number
 ---@field folder_mdate number
 ---@field folder_name string
+---@field full_path string
 ---@field player_name string
 ---@field completion number
 ---@field stages Stage[]
@@ -63,6 +64,7 @@ local function get_games()
     local game = get_game_info(name)
     game.folder_mdate = mdate
     game.folder_name = name
+    game.full_path = config.config_dir .. '/ap_save/' .. name
     table.insert(games, game)
   end
 
