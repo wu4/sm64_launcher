@@ -45,8 +45,7 @@ return {
   ---@param prog Program
   init = function(prog)
     local gxmid = love.graphics.getWidth() / 2
-    local gymid = love.graphics.getHeight() / 2
-    love.keyboard.setTextInput(true, gxmid - 200, gymid + 200, 400, 100)
+    love.keyboard.setTextInput(true, gxmid - 200, 200, 400, 100)
     will_create = false
     ip_text = setmetatable({text = '', label = 'IP:Port', x = 0, y = 0}, textbox_mt)
     name_text = setmetatable({text = config.default_name or '', label = 'Player Name', x = 0, y = 40}, textbox_mt)
@@ -102,7 +101,7 @@ return {
   draw = function(prog)
     love.graphics.setColor(1,1,1)
     love.graphics.push()
-    love.graphics.translate(love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + 200)
+    love.graphics.translate(love.graphics.getWidth() / 2, 200)
     love.graphics.setFont(gfx.smallfont)
     ip_text:draw()
     name_text:draw()
